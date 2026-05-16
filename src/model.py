@@ -87,14 +87,16 @@ def train_random_forest(X_train, y_train, X_test, y_test) -> tuple[object, Model
 
 
 def train_xgboost(X_train, y_train, X_test, y_test) -> tuple[object, ModelMetrics]:
-    # scale_pos_weight balances class imbalance for XGBoost
     pos_weight = float((y_train == 0).sum()) / max(float((y_train == 1).sum()), 1.0)
     model = XGBClassifier(
-        n_estimators=400,
-        max_depth=5,
+        n_estimators=150,          # was 400
+        max_depth=3,               # was 5
         learning_rate=0.05,
         subsample=0.85,
         colsample_bytree=0.85,
+        min_child_weight=10,       # NEW — prevents tiny leaves
+        reg_alpha=0.1,             # NEW — L1 regularization
+        reg_lambda=1.0,            # NEW — L2 regularization
         scale_pos_weight=pos_weight,
         eval_metric="logloss",
         random_state=42,

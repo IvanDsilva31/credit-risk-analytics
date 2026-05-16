@@ -145,17 +145,6 @@ credit-risk-analytics/
     └── test_basic.py              # pytest smoke tests
 ```
 
-## Concepts to internalize before interviews
-
-If you're asked about this project, lead with the *business framing* — predicting defaults to optimize lending profit — and have these talking points ready:
-
-- **Class imbalance handling** — stratified sampling for train/test, class weights in logistic regression and `scale_pos_weight` in XGBoost
-- **Why AUC alone is misleading** — explain the cost asymmetry between false positives and false negatives; this is where the profit curve earns its keep
-- **Data leakage** — the `LEAKAGE_COLS` constant in `src/data.py` is empty for this synthetic data, but explain how on real LendingClub data you'd drop `total_pymnt`, `recoveries`, `last_pymnt_d`, etc. before training
-- **Time-based vs random splits** — credit models in production split by `issue_d`; the code is set up for both
-- **SHAP vs feature importance** — SHAP gives signed, per-prediction contributions; tree feature importance is global and biased toward high-cardinality features
-- **Calibration** — model probabilities aren't necessarily calibrated; `CalibratedClassifierCV` and Platt scaling are the standard fixes
-
 ## Using a different LendingClub source
 
 The default real-data source is `AnguloM/loan_data` on Hugging Face (~10k rows, the classic mid-2010s LendingClub sample). If you want to point at a different Hugging Face dataset, pass `--dataset`:
@@ -165,14 +154,3 @@ python scripts/download_lending_club.py --dataset some-org/lending-club-larger
 ```
 
 You'll need to extend `transform()` in `scripts/download_lending_club.py` to handle any schema differences. For the full 2007-2018 LendingClub dump (~2.2M rows, ~150 columns) from Kaggle, you'd want to add a `LEAKAGE_COLS` list to `src/data.py` to drop post-origination columns before training.
-
-## Stretch ideas (when you want to extend the project)
-
-- **Time-based validation** — train on 2018 issues, validate on 2019, test on 2020; report performance drift
-- **Calibration** — add `CalibratedClassifierCV` and a calibration plot
-- **Cloud extension** — move the pipeline to Databricks/AWS; ingest data from S3, train on Spark, serve predictions via Lambda
-- **MLflow tracking** — log all experiments to a local MLflow store
-
-## License
-
-MIT (or whatever you prefer — pick one before publishing).

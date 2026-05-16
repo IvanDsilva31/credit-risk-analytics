@@ -88,9 +88,6 @@ Both are valid project deliverables. The differences:
 | **Reproducibility** | Identical across machines (seed=42) | Identical (dataset is fixed) |
 | **Strong predictors** | DTI, int rate, delinquencies, home ownership | FICO score, DTI, int rate, inquiries |
 | **AUC achieved (XGBoost)** | ~0.72 | ~0.66–0.68 (real data has more noise) |
-| **Best for interviews** | "I generated calibrated synthetic data and validated my pipeline against known patterns" | "I trained on real LendingClub loans" |
-
-If you're going to publish the GitHub repo, run with real data — the project narrative is stronger. The synthetic path stays useful for tests and offline development.
 
 ## What you'll see
 
@@ -144,13 +141,3 @@ credit-risk-analytics/
 └── tests/
     └── test_basic.py              # pytest smoke tests
 ```
-
-## Using a different LendingClub source
-
-The default real-data source is `AnguloM/loan_data` on Hugging Face (~10k rows, the classic mid-2010s LendingClub sample). If you want to point at a different Hugging Face dataset, pass `--dataset`:
-
-```bash
-python scripts/download_lending_club.py --dataset some-org/lending-club-larger
-```
-
-You'll need to extend `transform()` in `scripts/download_lending_club.py` to handle any schema differences. For the full 2007-2018 LendingClub dump (~2.2M rows, ~150 columns) from Kaggle, you'd want to add a `LEAKAGE_COLS` list to `src/data.py` to drop post-origination columns before training.

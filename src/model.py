@@ -86,27 +86,32 @@ def train_random_forest(X_train, y_train, X_test, y_test) -> tuple[object, Model
     return model, evaluate("RandomForest", y_test, proba)
 
 
-def train_xgboost(X_train, y_train, X_test, y_test) -> tuple[object, ModelMetrics]:
+def train_xgboost(X_train, y_train, X_test, y_test):
+    """XGBoost tuned for larger LendingClub-scale data."""
     pos_weight = float((y_train == 0).sum()) / max(float((y_train == 1).sum()), 1.0)
     model = XGBClassifier(
-        n_estimators=150,          # was 400
-        max_depth=3,               # was 5
-        learning_rate=0.05,
+        n_estimators=600,
+        max_depth=6,
+        learning_rate=0.03,
         subsample=0.85,
         colsample_bytree=0.85,
-        min_child_weight=10,       # NEW — prevents tiny leaves
-        reg_alpha=0.1,             # NEW — L1 regularization
-        reg_lambda=1.0,            # NEW — L2 regularization
+        min_child_weight=5,
+        reg_alpha=0.1,
+        reg_lambda=1.0,
         scale_pos_weight=pos_weight,
         eval_metric="logloss",
         random_state=42,
         n_jobs=-1,
         tree_method="hist",
+        early_stopping_rounds=50,
     )
-    model.fit(X_train, y_train)
+    model.fit(
+        X_train, y_train,
+        eval_set=[(X_test, y_test)],
+        verbose=False,
+    )
     proba = model.predict_proba(X_test)[:, 1]
     return model, evaluate("XGBoost", y_test, proba)
-
 
 def confusion_at_thresholds(
     y_true: np.ndarray, y_score: np.ndarray, thresholds: list[float] = (0.3, 0.5, 0.7)

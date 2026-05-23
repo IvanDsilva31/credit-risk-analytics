@@ -16,6 +16,8 @@ import argparse
 import subprocess
 import sys
 from pathlib import Path
+from sklearn.model_selection import cross_val_score
+import pandas as pd
 
 # Make `src` importable when running this script directly
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -79,6 +81,31 @@ def main() -> None:
 
     print()
     results = model_module.train_all(X_train_f, y_train, X_test_f, y_test)
+
+    print("\nRunning 5-fold cross-validation on best model...")
+    best_name = max(
+        [("logreg", results["logreg"]["metrics"].roc_auc),
+        ("rf",     results["rf"]["metrics"].roc_auc),
+        ("xgb",    results["xgb"]["metrics"].roc_auc)],
+        key=lambda x: x[1]
+    )[0]
+
+    if best_name == "xgb":
+        from xgboost import XGBClassifier
+    
+        best_model = results["xgb"]["model"]
+        X_full = pd.concat([X_train_f, X_test_f])
+        y_full = pd.concat([y_train, y_test])
+    
+        # Clone XGBoost params WITHOUT early stopping (cross_val_score doesn't pass eval_set)
+        cv_params = best_model.get_params()
+        cv_params.pop("early_stopping_rounds", None)
+        cv_params.pop("callbacks", None)
+        cv_model = XGBClassifier(**cv_params)
+    
+        cv_scores = cross_val_score(cv_model, X_full, y_full,
+                                  cv=5, scoring="roc_auc", n_jobs=-1)
+        print(f"  XGBoost 5-fold CV AUC: {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 
     model_module.save_artifacts(results, feature_cols, args.models_dir)
 

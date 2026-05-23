@@ -92,9 +92,46 @@ def _bucket_emp_length(years: float) -> str:
 def add_engineered(df: pd.DataFrame) -> pd.DataFrame:
     """Add derived columns. Doesn't drop anything."""
     df = df.copy()
+
+    # Income transformations
     df["log_annual_inc"] = np.log1p(df["annual_inc"])
     df["loan_to_income"] = df["loan_amnt"] / df["annual_inc"].clip(lower=1)
+
+    # Employment bucketing
     df["emp_length_bucket"] = df["emp_length"].apply(_bucket_emp_length)
+
+    # FICO-driven features (strongest predictors in real LendingClub data)
+    if "fico" in df.columns:
+        df["fico_squared"] = df["fico"] ** 2
+        df["fico_dti_interaction"] = df["fico"] * df["dti"]
+        df["fico_bucket"] = pd.cut(
+            df["fico"],
+            bins=[0, 660, 700, 740, 780, 850],
+            labels=["poor", "fair", "good", "very_good", "excellent"]
+        ).astype(str)
+
+    # Affordability ratios
+    if "installment" in df.columns:
+        df["installment_to_income"] = (
+            df["installment"] * 12 / df["annual_inc"].clip(lower=1)
+        )
+
+    if "revol_bal" in df.columns:
+        df["revol_bal_to_income"] = (
+            df["revol_bal"] / df["annual_inc"].clip(lower=1)
+        )
+
+    # Threshold flags
+    df["high_util_flag"] = (df["revol_util"] > 80).fillna(False).astype(int)
+    df["dti_high_flag"] = (df["dti"] > 25).astype(int)
+    df["delinq_flag"] = (df["delinq_2yrs"] > 0).astype(int)
+
+    if "inq_last_6mths" in df.columns:
+        df["multi_inquiry_flag"] = (df["inq_last_6mths"] > 2).astype(int)
+
+    if "pub_rec" in df.columns:
+        df["has_pub_rec_flag"] = (df["pub_rec"] > 0).astype(int)
+
     return df
 
 

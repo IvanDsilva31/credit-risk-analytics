@@ -18,9 +18,13 @@ env/
 
 # Project data and artifacts
 data/*.csv
+data/*.csv.gz
+data/*.zip
 data/*.parquet
+data/*.json
 models/*.joblib
 !data/.gitkeep
+!data/README.md
 !models/.gitkeep
 
 # OS

@@ -1,143 +1,87 @@
 # Credit Risk Default Prediction Pipeline
 
-End-to-end ML pipeline that predicts loan defaults, explains decisions with SHAP and an LLM-generated risk memo, and surfaces the most similar historical borrowers via embedding-based search — all in an interactive Streamlit dashboard.
+End-to-end ML pipeline that predicts loan defaults on real LendingClub data, with an interactive Streamlit dashboard for applicant risk scoring and portfolio analytics.
 
-**Stack:** Python · scikit-learn · XGBoost · DuckDB SQL · SHAP · Streamlit · Google Gemini (free tier)
+**Stack:** Python · scikit-learn · XGBoost · DuckDB SQL · SHAP · Streamlit
 
-## What it does
+## Setup
 
-- **Trains and compares three models** — logistic regression baseline, random forest, and XGBoost — on loan-level data
-- **Evaluates with banking-grade metrics** — ROC-AUC, PR-AUC, KS statistic, and threshold-tuned profit curves (not just accuracy)
-- **Explains every prediction** using SHAP values, with the top contributing features visualized and the top 8 sent to an LLM for a plain-English memo
-- **Finds similar historical borrowers** through text-embedding cosine similarity on natural-language borrower descriptions
-- **Provides interactive dashboards** for portfolio overview, applicant scoring, and threshold/profit tradeoff exploration
-
-## Why these design choices
-
-A few decisions worth calling out (this is what an interviewer will ask):
-
-- **PR-AUC alongside ROC-AUC** — credit data is imbalanced, and ROC-AUC paints an optimistic picture; PR-AUC tells the real story
-- **Profit curve, not just accuracy** — every credit decision has asymmetric costs (a missed default loses 3–4x what an approved good loan earns); the optimal threshold isn't 0.5
-- **DuckDB for SQL** — runs SQL directly on dataframes/parquet with zero setup, mirroring how modern analytics teams operate
-- **Graceful fallbacks for AI features** — works fully offline; LLM and embedding features upgrade automatically when a key is set, never break
-
-## Setup (macOS, Python 3.11)
+Requires Python 3.11+ and macOS, Linux, or Windows.
 
 ```bash
-# 1. Clone and enter the repo
-git clone <your-repo-url> credit-risk-analytics
+git clone https://github.com/IvanDsilva31/credit-risk-analytics.git
 cd credit-risk-analytics
 
-# 2. Create and activate a virtual environment
 python3.11 -m venv .venv
 source .venv/bin/activate
 
-# 3. Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
-
-# 4. (Optional) Set up Gemini for LLM memos and embedding similarity
-cp .env.example .env
-# Open .env and paste your free key from https://aistudio.google.com/app/apikey
 ```
-
-Without a Gemini key, everything still runs — the LLM memo falls back to a templated explanation, and similarity falls back to scaled-feature cosine similarity.
 
 ## Run
 
-You have two data options. Pick one.
+Pick one of three data sources.
 
-**Option A — Synthetic data (default, instant, works offline):**
+**Synthetic data (instant, offline):**
 
 ```bash
 python scripts/run_pipeline.py
 ```
 
-That's it — the pipeline auto-generates a calibrated synthetic dataset on first run, then trains.
-
-**Option B — Real LendingClub data (~10-second one-time download):**
+**Sample LendingClub data from Hugging Face:**
 
 ```bash
 python scripts/run_pipeline.py --source real
 ```
 
-Pulls the [AnguloM/loan_data](https://huggingface.co/datasets/AnguloM/loan_data) dataset from Hugging Face — 9,578 real LendingClub loans (223 KB), released under the Database Contents License (DbCL) v1.0 which permits commercial use and redistribution.
+**Full LendingClub data from Kaggle:**
 
-Either way, then launch the dashboard:
+```bash
+kaggle datasets download -d wordsforthewise/lending-club -p data/
+cd data && unzip lending-club.zip && cd ..
+python scripts/download_full_lendingclub.py --sample 200000
+python scripts/run_pipeline.py
+```
+
+Requires a Kaggle account and API token — see [Kaggle's API docs](https://www.kaggle.com/docs/api).
+
+## Launch the dashboard
 
 ```bash
 streamlit run dashboard/app.py
 ```
 
-The dashboard opens at [http://localhost:8501](http://localhost:8501).
+Opens at [http://localhost:8501](http://localhost:8501).
 
-To run tests:
+## Tests
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-### Which dataset should I use?
-
-Both are valid project deliverables. The differences:
-
-| | Synthetic | Real LendingClub |
-|---|---|---|
-| **First-run time** | Instant | ~10 seconds (downloads ~250 KB) |
-| **Rows** | 10,000 (configurable) | 9,578 |
-| **Reproducibility** | Identical across machines (seed=42) | Identical (dataset is fixed) |
-| **Strong predictors** | DTI, int rate, delinquencies, home ownership | FICO score, DTI, int rate, inquiries |
-| **AUC achieved (XGBoost)** | ~0.72 | ~0.66–0.68 (real data has more noise) |
-
-## What you'll see
-
-After step 2, expected console output:
-
-```
-Loading data from data/loans.csv...
-  Loaded 10,000 rows. Default rate: 11.61%
-
-=== default_rate_by_grade ===  ← real SQL run via DuckDB
-grade  n_loans  n_defaults  default_rate_pct  avg_int_rate
-    A     2456          43              1.75          7.42
-    B     2837         163              5.75         10.96
-    ...
-
-Training models...
-
-LogisticRegression  ROC-AUC: 0.7340  PR-AUC: 0.2909  KS: 0.3583
-RandomForest        ROC-AUC: 0.7164  PR-AUC: 0.2539  KS: 0.3441
-XGBoost             ROC-AUC: 0.7171  PR-AUC: 0.2359  KS: 0.3440
-
-Saved bundle → models/model_bundle.joblib
-```
-
-In the dashboard:
-- **Portfolio Overview** — default rates by grade, purpose, DTI bucket
-- **Risk Scoring** — fill in an applicant form → P(default), SHAP chart, LLM memo, similar borrowers
-- **Threshold & Profit Tuning** — adjust profit/loss parameters → see optimal decision threshold
-
 ## Project structure
 
 ```
 credit-risk-analytics/
-├── README.md
-├── requirements.txt
-├── .env.example
-├── data/                          # CSV outputs (gitignored)
-├── models/                        # Trained model bundle (gitignored)
+├── data/                              # Data files (gitignored)
+├── models/                            # Trained models (gitignored)
 ├── src/
-│   ├── data.py                    # Load, clean, split
-│   ├── features.py                # Feature engineering + one-hot encoding
-│   ├── model.py                   # Train, evaluate, save, predict
-│   ├── ai.py                      # Gemini LLM memos + embedding similarity
-│   └── sql_eda.py                 # DuckDB-powered EDA queries
+│   ├── data.py                        # Load, clean, split
+│   ├── features.py                    # Feature engineering
+│   ├── model.py                       # Train, evaluate, predict
+│   └── sql_eda.py                     # DuckDB SQL queries
 ├── dashboard/
-│   └── app.py                     # Streamlit dashboard
+│   └── app.py                         # Streamlit dashboard
 ├── scripts/
-│   ├── generate_sample_data.py    # Synthetic LendingClub-style data
-│   ├── download_lending_club.py   # Real LendingClub data from Hugging Face
-│   └── run_pipeline.py            # End-to-end orchestrator (--source flag)
+│   ├── generate_sample_data.py
+│   ├── download_lending_club.py
+│   ├── download_full_lendingclub.py
+│   └── run_pipeline.py
 └── tests/
-    └── test_basic.py              # pytest smoke tests
+    └── test_basic.py
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
